@@ -23,6 +23,7 @@ dependencies:
   image: ^4.10.1
   image_picker: ^1.2.3
   intl: ^0.20.3
+  liquid_glass_renderer: 0.2.0-dev.4
   lucide_icons_flutter: ^3.1.21
   path_provider: ^2.1.6
   share_plus: ^13.3.1

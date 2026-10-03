@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:liquid_glass_renderer/liquid_glass_renderer.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../providers/providers.dart';
@@ -92,141 +94,283 @@ class AppShell extends ConsumerWidget {
   }
 }
 
-/// Floating rounded bar. One filled pill sits behind the tabs and slides to the active
-/// tab; tab widths animate on the same curve so the pill always lines up with its tab.
-class _PillNavBar extends ConsumerWidget {
+/// Liquid Glass navbar: a glass capsule that refracts the page scrolling beneath it,
+/// with a glass droplet marking the active tab. The droplet springs between tabs and
+/// squashes/stretches with its speed; dragging along the bar turns it into a lens that
+/// magnifies the icons and snaps to the nearest tab on release.
+class _PillNavBar extends ConsumerStatefulWidget {
   const _PillNavBar({required this.currentPath});
   final String currentPath;
 
-  static const _duration = Duration(milliseconds: 380);
-  static const _curve = Curves.easeOutCubic;
+  @override
+  ConsumerState<_PillNavBar> createState() => _PillNavBarState();
+}
+
+class _PillNavBarState extends ConsumerState<_PillNavBar> with TickerProviderStateMixin {
+  static const _barHeight = 64.0;
+  static const _inset = 6.0;
+  static const _spring = SpringDescription(mass: 1, stiffness: 320, damping: 24);
+
+  /// Droplet centre, in pixels from the left edge of the tab row.
+  late final AnimationController _x = AnimationController.unbounded(vsync: this);
+
+  /// 0 = resting droplet, 1 = enlarged lens while the finger is down.
+  late final AnimationController _lens = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 220),
+    reverseDuration: const Duration(milliseconds: 320),
+  );
+
+  double _tabWidth = 0;
+  bool _dragging = false;
+  int _dragIndex = -1;
+  bool _placed = false;
+
+  int get _activeIndex => _navItems.indexWhere((item) => _isActive(item, widget.currentPath));
+  bool get _reduceMotion => MediaQuery.of(context).disableAnimations;
+  double _centerOf(int i) => (i + 0.5) * _tabWidth;
+  int _indexAt(double x) => (x / _tabWidth).floor().clamp(0, _navItems.length - 1);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void didUpdateWidget(_PillNavBar old) {
+    super.didUpdateWidget(old);
+    if (old.currentPath != widget.currentPath && !_dragging && _activeIndex >= 0) _springTo(_centerOf(_activeIndex));
+  }
+
+  @override
+  void dispose() {
+    _x.dispose();
+    _lens.dispose();
+    super.dispose();
+  }
+
+  void _springTo(double target, {double velocity = 0}) {
+    if (_reduceMotion || _tabWidth == 0) {
+      _x.value = target;
+      return;
+    }
+    _x.animateWith(SpringSimulation(_spring, _x.value, target, velocity));
+  }
+
+  void _go(int i) {
+    if (i == _activeIndex) {
+      _springTo(_centerOf(i));
+      return;
+    }
+    HapticFeedback.selectionClick();
+    context.go(_navItems[i].path);
+  }
+
+  void _onDragStart(DragStartDetails d) {
+    _dragging = true;
+    _x.stop();
+    _dragIndex = _indexAt(d.localPosition.dx);
+    _lens.forward();
+    _x.value = d.localPosition.dx.clamp(_tabWidth / 2, _tabWidth * (_navItems.length - 0.5));
+  }
+
+  void _onDragUpdate(DragUpdateDetails d) {
+    _x.value = (_x.value + d.delta.dx).clamp(_tabWidth / 2, _tabWidth * (_navItems.length - 0.5));
+    final i = _indexAt(_x.value);
+    if (i != _dragIndex) {
+      _dragIndex = i;
+      HapticFeedback.selectionClick(); // tick as the lens crosses each tab
+    }
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    _dragging = false;
+    _lens.reverse();
+    final i = _indexAt(_x.value);
+    _springTo(_centerOf(i), velocity: d.velocity.pixelsPerSecond.dx);
+    if (i != _activeIndex) context.go(_navItems[i].path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final c = context.colors;
     final unread = ref.watch(unreadNotificationsProvider).value?.length ?? 0;
-    final activeIndex = _navItems.indexWhere((item) => _isActive(item, currentPath));
-    final reduceMotion = MediaQuery.of(context).disableAnimations;
-    final duration = reduceMotion ? Duration.zero : _duration;
+    final active = _activeIndex;
+
+    // Glass tuned per theme: a faint white veil on dark pages, a milky one on light pages
+    final barSettings = LiquidGlassSettings(
+      thickness: 18,
+      blur: 18,
+      glassColor: c.isDark ? const Color(0x9918181B) : const Color(0xA6FFFFFF),
+      lightIntensity: c.isDark ? 0.6 : 0.9,
+      ambientStrength: 0.3,
+      refractiveIndex: 1.25,
+      saturation: 1.6,
+    );
+    final dropSettings = LiquidGlassSettings(
+      thickness: 22,
+      blur: 2,
+      glassColor: c.isDark ? const Color(0x26FFFFFF) : const Color(0x14000000),
+      lightIntensity: 1.2,
+      ambientStrength: 0.4,
+      refractiveIndex: 1.45,
+      chromaticAberration: 0.02,
+      saturation: 1.4,
+    );
 
     return SafeArea(
       top: false,
       minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Container(
-        height: 64,
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: c.card,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: c.border),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: c.isDark ? 0.5 : 0.12),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Semantics(
-          container: true,
-          label: 'Main navigation',
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final total = constraints.maxWidth;
-              final count = _navItems.length;
-              // Active tab is wide enough for icon + label; the rest share what's left
-              final activeWidth = activeIndex < 0 ? total / count : (total * 0.36).clamp(112.0, 150.0);
-              final inactiveWidth = activeIndex < 0 ? total / count : (total - activeWidth) / (count - 1);
+      child: SizedBox(
+        height: _barHeight,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final rowWidth = constraints.maxWidth - _inset * 2;
+            _tabWidth = rowWidth / _navItems.length;
+            if (!_placed && active >= 0) {
+              _x.value = _centerOf(active);
+              _placed = true;
+            }
 
-              return Stack(
-                children: [
-                  // The sliding pill
-                  AnimatedPositioned(
-                    duration: duration,
-                    curve: _curve,
-                    left: activeIndex < 0 ? 0 : activeIndex * inactiveWidth,
-                    top: 0,
-                    bottom: 0,
-                    width: activeWidth,
-                    child: AnimatedOpacity(
-                      duration: duration,
-                      opacity: activeIndex < 0 ? 0 : 1,
+            return Semantics(
+              container: true,
+              label: 'Main navigation',
+              child: GestureDetector(
+                onHorizontalDragStart: _onDragStart,
+                onHorizontalDragUpdate: _onDragUpdate,
+                onHorizontalDragEnd: _onDragEnd,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // 1. The glass bar with the icons on it
+                    Positioned.fill(
                       child: DecoratedBox(
-                        decoration: BoxDecoration(color: c.ink, borderRadius: BorderRadius.circular(999)),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(_barHeight / 2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: c.isDark ? 0.45 : 0.12),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        // The bar never moves, so it uses live backdrop-blur glass ("fake"): the
+                        // refracting renderer caches still shapes and showed stale content.
+                        // The moving droplet below keeps real refraction.
+                        child: LiquidGlass.withOwnLayer(
+                          fake: true,
+                          settings: barSettings,
+                          shape: LiquidRoundedSuperellipse(
+                            borderRadius: _barHeight / 2,
+                            side: BorderSide(color: Colors.white.withValues(alpha: c.isDark ? 0.10 : 0.6), width: 0.8),
+                          ),
+                          child: GlassGlow(
+                            glowColor: c.isDark ? Colors.white12 : Colors.white38,
+                            hitTestBehavior: HitTestBehavior.translucent,
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  // Fill the bar's height so each tab is vertically centred in the pill
-                  Positioned.fill(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (var i = 0; i < count; i++)
-                          AnimatedContainer(
-                            duration: duration,
-                            curve: _curve,
-                            width: i == activeIndex ? activeWidth : inactiveWidth,
-                            child: _PillTab(
-                              item: _navItems[i],
-                              active: i == activeIndex,
-                              badge: _navItems[i].path == '/groups' && i != activeIndex ? unread : 0,
-                              duration: duration,
+                    // 2. The droplet / lens (under the icons so they stay crisp)
+                    if (active >= 0 || _dragging)
+                      AnimatedBuilder(
+                        animation: Listenable.merge([_x, _lens]),
+                        builder: (context, _) {
+                          // Squash & stretch: wider and flatter the faster it travels
+                          final speed = _reduceMotion ? 0.0 : (_x.velocity.abs() / 2400).clamp(0.0, 0.32);
+                          final lens = Curves.easeOutBack.transform(_lens.value.clamp(0.0, 1.0));
+                          final baseW = _tabWidth - 4;
+                          const baseH = _barHeight - _inset * 2;
+                          final w = baseW * (1 + speed + 0.28 * lens);
+                          final h = baseH * (1 - speed * 0.35 + 0.30 * lens);
+                          return Positioned(
+                            left: _inset + _x.value - w / 2,
+                            top: (_barHeight - h) / 2,
+                            width: w,
+                            height: h,
+                            child: IgnorePointer(
+                              child: LiquidGlass.withOwnLayer(
+                                settings: dropSettings,
+                                shape: LiquidRoundedSuperellipse(
+                                  borderRadius: h / 2,
+                                  side: BorderSide(color: Colors.white.withValues(alpha: c.isDark ? 0.18 : 0.7), width: 0.8),
+                                ),
+                                child: const SizedBox.expand(),
+                              ),
                             ),
+                          );
+                        },
+                      ),
+                    // 3. Icons on top; the one under the lens grows while dragging
+                    Positioned.fill(
+                      child: Padding(
+                        padding: const EdgeInsets.all(_inset),
+                        child: AnimatedBuilder(
+                          animation: Listenable.merge([_x, _lens]),
+                          builder: (context, _) => Row(
+                            children: [
+                              for (var i = 0; i < _navItems.length; i++)
+                                Expanded(
+                                  child: _GlassTab(
+                                    item: _navItems[i],
+                                    active: i == active,
+                                    badge: _navItems[i].path == '/groups' && i != active ? unread : 0,
+                                    magnify: _tabWidth == 0
+                                        ? 0
+                                        : _lens.value.clamp(0.0, 1.0) * (1 - ((_x.value - _centerOf(i)).abs() / _tabWidth)).clamp(0.0, 1.0),
+                                    onTap: () => _go(i),
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
+                        ),
+                      ),
                     ),
-                  ),
-                ],
-              );
-            },
-          ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _PillTab extends StatelessWidget {
-  const _PillTab({required this.item, required this.active, required this.badge, required this.duration});
+/// Icon-only tab. The active icon is full strength and slightly larger.
+class _GlassTab extends StatelessWidget {
+  const _GlassTab({required this.item, required this.active, required this.badge, required this.onTap, this.magnify = 0});
   final _NavItem item;
   final bool active;
   final int badge;
-  final Duration duration;
+  final VoidCallback onTap;
+  final double magnify; // 0..1, how close the dragging lens is
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-
     return Semantics(
       button: true,
       selected: active,
       label: badge > 0 ? '${item.label}, $badge unread' : item.label,
       excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          if (active) return;
-          HapticFeedback.selectionClick();
-          context.go(item.path);
-        },
-        // Icon colour cross-fades as the pill arrives / leaves
-        child: TweenAnimationBuilder<Color?>(
-          duration: duration,
-          curve: Curves.easeOut,
-          tween: ColorTween(end: active ? c.paper : c.ink.withValues(alpha: 0.6)),
-          builder: (context, fg, _) => ClipRect(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedScale(
-                  // A small pop on the icon when its tab becomes active
-                  scale: active ? 1.0 : 0.92,
-                  duration: duration,
-                  curve: Curves.easeOutBack,
+      child: Tooltip(
+        message: item.label,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Center(
+            child: TweenAnimationBuilder<Color?>(
+              duration: const Duration(milliseconds: 250),
+              tween: ColorTween(end: active ? c.ink : c.ink.withValues(alpha: 0.55)),
+              builder: (context, fg, _) => AnimatedScale(
+                scale: active ? 1.12 : 1.0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutBack,
+                child: Transform.scale(
+                  // Follows the finger directly (no easing) while the lens passes over
+                  scale: 1 + 0.3 * magnify,
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      item.profile ? _TabAvatar(color: fg!) : Icon(item.icon, size: 20, color: fg),
+                      item.profile ? _TabAvatar(color: fg!) : Icon(item.icon, size: 22, color: fg),
                       if (badge > 0)
                         Positioned(
                           top: -6,
@@ -250,42 +394,7 @@ class _PillTab extends StatelessWidget {
                     ],
                   ),
                 ),
-                // Label fades and slides in beside the icon; the old tab's label fades out
-                Flexible(
-                  child: AnimatedSize(
-                    duration: duration,
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.centerLeft,
-                    child: AnimatedSwitcher(
-                      duration: duration,
-                      switchInCurve: Curves.easeOut,
-                      switchOutCurve: Curves.easeIn,
-                      layoutBuilder: (current, previous) =>
-                          Stack(alignment: Alignment.centerLeft, children: [...previous, ?current]),
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        child: SlideTransition(
-                          position: Tween(begin: const Offset(0.25, 0), end: Offset.zero).animate(animation),
-                          child: child,
-                        ),
-                      ),
-                      child: active
-                          ? Padding(
-                              key: const ValueKey('label'),
-                              padding: const EdgeInsets.only(left: 8),
-                              child: Text(
-                                item.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                softWrap: false,
-                                style: inter(size: FontSizes.sm, weight: FontWeight.w600, color: fg),
-                              ),
-                            )
-                          : const SizedBox.shrink(key: ValueKey('none')),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
