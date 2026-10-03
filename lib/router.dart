@@ -134,20 +134,31 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-/// Tab-to-tab transition: the new page fades in while rising slightly (detail pages
-/// pushed on top keep the platform's default slide).
+/// Tab-to-tab "fade-through": the old page fades out during the first third, then the
+/// new page fades in with a slight zoom. They never overlap, so the transparent pages
+/// can't show through each other as a doubled image while switching tabs.
+///
+/// A replaced tab page isn't animated out by the Navigator: it stays underneath until
+/// the new page has arrived. Its fade-out is therefore driven by [secondaryAnimation],
+/// which tracks the page coming in on top of it.
 CustomTransitionPage<void> fadePage(GoRouterState state, Widget child) => CustomTransitionPage<void>(
       key: state.pageKey,
       child: child,
-      transitionDuration: const Duration(milliseconds: 280),
-      reverseTransitionDuration: const Duration(milliseconds: 200),
-      transitionsBuilder: (context, animation, _, child) {
-        final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      transitionDuration: const Duration(milliseconds: 300),
+      reverseTransitionDuration: const Duration(milliseconds: 300),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        final fadeIn = CurvedAnimation(parent: animation, curve: const Interval(0.35, 1, curve: Curves.easeOut));
+        final fadeOut = ReverseAnimation(
+          CurvedAnimation(parent: secondaryAnimation, curve: const Interval(0, 0.35, curve: Curves.easeIn)),
+        );
+        final zoom = Tween(begin: 0.97, end: 1.0).animate(
+          CurvedAnimation(parent: animation, curve: const Interval(0.35, 1, curve: Curves.easeOutCubic)),
+        );
         return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween(begin: const Offset(0, 0.03), end: Offset.zero).animate(curved),
-            child: child,
+          opacity: fadeOut,
+          child: FadeTransition(
+            opacity: fadeIn,
+            child: ScaleTransition(scale: zoom, child: child),
           ),
         );
       },
