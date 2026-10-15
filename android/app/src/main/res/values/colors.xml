@@ -2,4 +2,5 @@
 <resources>
     <!-- Same #121212 as the Flutter splash and login screen -->
     <color name="splash_bg">#121212</color>
+	<color name="ic_launcher_background">#18181B</color>
 </resources>
