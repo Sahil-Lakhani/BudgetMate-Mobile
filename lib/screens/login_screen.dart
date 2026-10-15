@@ -10,6 +10,7 @@ import '../theme/app_theme.dart';
 import '../widgets/dot_shader_background.dart';
 import '../widgets/footer.dart';
 import '../widgets/ui.dart';
+import '../widgets/app_logo.dart';
 
 /// Port of pages/Login.jsx — always dark, dot-shader background, Google sign-in.
 class LoginScreen extends ConsumerStatefulWidget {
@@ -87,6 +88,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final c = context.colors;
     final linkStyle = inter(size: FontSizes.xs, color: c.news, decoration: TextDecoration.underline);
     return Column(mainAxisSize: MainAxisSize.min, children: [
+      const AppLogo(size: 88),
+      const SizedBox(height: 20),
       Text('BudgetMate',
           textAlign: TextAlign.center,
           style: inter(size: FontSizes.x4l, weight: FontWeight.w700, color: Colors.white, letterSpacing: -0.9, height: 1.1)),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
+import 'app_logo.dart';
 
 /// Shown while the saved sign-in is restored. Same #121212 as the Android launch
 /// screen and the login page, so startup reads as one continuous screen.
@@ -24,6 +25,8 @@ class SplashScreen extends StatelessWidget {
               child: Transform.scale(scale: 0.94 + 0.06 * t, child: child),
             ),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const AppLogo(size: 88),
+              const SizedBox(height: 20),
               Text('BudgetMate',
                   style: inter(size: FontSizes.x4l, weight: FontWeight.w700, color: Colors.white, letterSpacing: -0.9)),
               const SizedBox(height: 20),

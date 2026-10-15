@@ -12,6 +12,7 @@ import '../theme/app_theme.dart';
 import 'footer.dart';
 import 'offline_banner.dart';
 import 'ui.dart';
+import 'app_logo.dart';
 
 class _NavItem {
   const _NavItem(this.icon, this.label, this.path, {this.profile = false, this.alsoActiveOn = const []});
@@ -70,10 +71,13 @@ class AppShell extends ConsumerWidget {
                     children: [
                       GestureDetector(
                         onTap: () => context.go('/'),
-                        child: Text(
-                          'BudgetMate',
-                          style: inter(size: FontSizes.xl, weight: FontWeight.w700, color: c.ink),
-                        ),
+                        child: Row(mainAxisSize: MainAxisSize.min, spacing: 10, children: [
+                          const AppLogo(size: 34),
+                          Text(
+                            'BudgetMate',
+                            style: inter(size: FontSizes.xl, weight: FontWeight.w700, color: c.ink),
+                          ),
+                        ]),
                       ),
                     ],
                   ),
