@@ -160,7 +160,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ? 'Account deletion was cancelled — please confirm with Google to continue.'
             : (e is FirebaseAuthException && e.code == 'user-mismatch')
                 ? 'Please confirm with the same Google account you are signed in with.'
-                : 'Account deletion failed. Please try again, or contact us via the Impressum.';
+                : 'Account deletion failed. Please try again, or contact us via the Contact page.';
         _dataBusy = '';
       });
     }

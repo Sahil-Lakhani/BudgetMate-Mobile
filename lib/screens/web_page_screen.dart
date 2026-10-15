@@ -9,7 +9,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ui.dart';
 
-/// Shows a page of the BudgetMate website (Privacy Policy, Terms, Impressum …) inside
+/// Shows a page of the BudgetMate website (Privacy Policy, Terms, Contact …) inside
 /// the app, so the reviewed legal text keeps a single source of truth. Links to other
 /// sites open in the phone's browser.
 class WebPageScreen extends StatefulWidget {

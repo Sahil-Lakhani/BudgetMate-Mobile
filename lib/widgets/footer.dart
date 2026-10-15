@@ -4,9 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 
-const _legalTitles = {'/privacy': 'Privacy Policy', '/terms': 'Terms', '/imprint': 'Impressum'};
+const _legalTitles = {
+  '/privacy': 'Privacy Policy',
+  '/terms': 'Terms',
+  '/contact': 'Contact',
+  '/delete-account': 'Delete account',
+};
 
-/// Opens one of the website's legal pages (/privacy, /terms, /imprint, optionally with
+/// Opens one of the website's legal pages (/privacy, /terms, /contact …, optionally with
 /// an #anchor) in the in-app web view (screens/web_page_screen.dart).
 void openLegalPage(BuildContext context, String path) {
   final title = _legalTitles[path.split('#').first] ?? 'BudgetMate';
@@ -33,8 +38,8 @@ class Footer extends StatelessWidget {
     return Column(children: [
       Wrap(alignment: WrapAlignment.center, spacing: 16, runSpacing: 4, children: [
         link('Privacy Policy', '/privacy'),
-        link('Impressum', '/imprint'),
         link('Terms', '/terms'),
+        link('Contact', '/contact'),
       ]),
       const SizedBox(height: 8),
       Text('© ${DateTime.now().year} BudgetMate', style: style, textAlign: TextAlign.center),
