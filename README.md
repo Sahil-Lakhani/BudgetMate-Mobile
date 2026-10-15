@@ -19,16 +19,19 @@ data as the website, so everything stays in sync between phone and browser.
 
 ```bash
 flutter pub get
-flutter run --dart-define=API_BASE_URL=https://your-domain
+cp env.example.json env.json   # put the GEMINI_API_KEY from the web app's .env here
+flutter run --dart-define-from-file=env.json
 ```
 
-`API_BASE_URL` is the deployed web app (hosts `/api/gemini` and the legal pages).
-Without it the app works, but receipt scanning, AI tips and legal pages are unavailable.
+With `GEMINI_API_KEY` in `env.json` (gitignored), receipt scanning and AI tips call Gemini
+directly. Without it they go through the web app's `/api/gemini`
+(`https://budget-mate-two.vercel.app`, override with `--dart-define=API_BASE_URL=…`), which
+also serves the legal pages.
 
 ## Build
 
 ```bash
-flutter build apk --release --dart-define=API_BASE_URL=https://your-domain
+flutter build apk --release --dart-define-from-file=env.json
 ```
 
 ## Checks
