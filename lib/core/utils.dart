@@ -26,6 +26,19 @@ double? parseNum(Object? v) {
   return null;
 }
 
+/// Unit price of a scanned receipt item. Gemini's `price` is the line total, so prefer
+/// `unit_price` and otherwise divide the total by the quantity (rounded to cents).
+String scannedUnitPrice(Map item) {
+  final unit = parseNum(item['unit_price']);
+  if (unit != null) return _numText(unit);
+  final total = parseNum(item['price']) ?? 0;
+  final qty = parseNum(item['quantity']);
+  if (qty == null || qty <= 0) return _numText(total);
+  return _numText((total / qty * 100).round() / 100);
+}
+
+String _numText(double v) => v == v.truncateToDouble() ? v.toInt().toString() : v.toString();
+
 /// "YYYY-MM" → DateTime on the 1st of that month (local).
 DateTime monthDate(String key) {
   final parts = key.split('-').map(int.parse).toList();

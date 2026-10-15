@@ -123,7 +123,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
         ..clear()
         ..addAll(items.whereType<Map>().map((it) => _ScanItem(
               name: '${it['name'] ?? ''}',
-              price: it['price'] == null ? '0' : '${it['price']}',
+              price: scannedUnitPrice(it),
               quantity: it['quantity'] == null ? '1' : '${it['quantity']}',
               category: '${it['category'] ?? 'Other'}',
             )));
