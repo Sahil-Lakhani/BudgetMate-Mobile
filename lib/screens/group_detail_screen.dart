@@ -234,7 +234,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 child: Text('No splits yet. Tap "Add Split" to create one.', textAlign: TextAlign.center, style: inter(size: FontSizes.base, color: c.news)),
               ),
             ),
-          for (final s in splits) Padding(padding: const EdgeInsets.only(bottom: 12), child: _splitCard(c, s, uid, symbol)),
+          for (final s in orderSplitsForViewer(splits, uid)) Padding(padding: const EdgeInsets.only(bottom: 12), child: _splitCard(c, s, uid, symbol)),
         ]),
         // Leave / delete
         AppCard(
@@ -298,8 +298,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
 
   Widget _splitCard(AppColors c, GroupSplit s, String uid, String symbol) {
     final mine = s.participant(uid);
-    final settledCount = s.participants.where((p) => p.settled).length;
-    final allSettled = settledCount == s.participants.length;
+    final status = splitViewStatus(s, uid);
     final payerName = s.payerId == uid ? 'you' : (s.payerName.isNotEmpty ? s.payerName : 'someone');
     final myPending = mine != null && !mine.settled && s.payerId != uid;
 
@@ -335,7 +334,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           else
             Text('Not included', style: inter(size: FontSizes.xs, color: c.news)),
           const SizedBox(height: 4),
-          Pill(allSettled ? 'Settled' : 'Pending', green: allSettled, muted: !allSettled),
+          Pill(status.label, green: status.done, muted: !status.done),
         ]),
       ]),
     );

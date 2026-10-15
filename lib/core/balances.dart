@@ -52,6 +52,25 @@ Balances computeBalances(List<GroupSplit> splits, String me) {
   return Balances(youOwe: youOwe, owedToYou: owedToYou, net: round2(owedToYou - youOwe), byMember: byMember);
 }
 
+/// A split's status as [me] sees it: a member only cares whether *they* have paid;
+/// the payer cares whether everyone has paid them back. `done` splits sink to the bottom.
+({bool done, String label}) splitViewStatus(GroupSplit s, String me) {
+  final settledCount = s.participants.where((p) => p.settled).length;
+  final allSettled = settledCount == s.participants.length;
+  final mine = s.participant(me);
+  if (mine != null && s.payerId != me) {
+    return (done: mine.settled, label: mine.settled ? 'Paid' : 'Unpaid');
+  }
+  // Payer sees overall progress; someone not in the split sees it too but has nothing to do
+  return (done: allSettled || mine == null, label: allSettled ? 'Settled' : '$settledCount/${s.participants.length} paid');
+}
+
+/// Unpaid first, keeping the incoming (newest-first) order within each half.
+List<GroupSplit> orderSplitsForViewer(List<GroupSplit> splits, String me) => [
+      ...splits.where((s) => !splitViewStatus(s, me).done),
+      ...splits.where((s) => splitViewStatus(s, me).done),
+    ];
+
 /// Splits [total] into [count] equal shares; the rounding remainder goes to
 /// [remainderIndex] (the payer), falling back to the first share.
 List<double> distributeEvenly(double total, int count, [int remainderIndex = 0]) {
